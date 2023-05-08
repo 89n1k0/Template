@@ -63,5 +63,11 @@ namespace Template_4333
             ibragimov.Show();
             this.Hide();
         }
+        private void _4333_Fedyanin(object sender, RoutedEventArgs e)
+        {
+            _4333_Fedyanin fedyanin = new _4333_Fedyanin();
+            fedyanin.Show();
+            this.Hide();
+        }
     }
 }
