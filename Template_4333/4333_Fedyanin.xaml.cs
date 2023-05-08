@@ -13,6 +13,10 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using Excel = Microsoft.Office.Interop.Excel;
+using Word = Microsoft.Office.Interop.Word;
+using System.Numerics;
+using System.IO;
+using System.Text.Json;
 
 namespace Template_4333
 {
@@ -21,9 +25,21 @@ namespace Template_4333
     /// </summary>
     public partial class _4333_Fedyanin : Window
     {
+        private const int _sheetsCount = 3;
         public _4333_Fedyanin()
         {
             InitializeComponent();
+        }
+        class Employee
+        {
+            public int Id { get; set; }
+            public string CodeStaff { get; set; }
+            public string Position { get; set; }
+            public string FullName { get; set; }
+            public string Log { get; set; }
+            public string Password { get; set; }
+            public string LastEnter { get; set; }
+            public string TypeEnter { get; set; }
         }
         private void import_Click(object sender, RoutedEventArgs e)
         {
@@ -115,6 +131,124 @@ namespace Template_4333
                     rowIndex++;
                 }
             }
+        }
+        private async void importJSON_Click(object sender, RoutedEventArgs e)
+        {
+            OpenFileDialog ofd = new OpenFileDialog()
+            {
+                DefaultExt = "*.json",
+                Filter = "файл Json |*.json",
+                Title = "Выберите файл базы данных"
+            };
+            if (!(ofd.ShowDialog() == true))
+                return;
+            List<Employee> list;
+            using (FileStream fs = new FileStream(ofd.FileName, FileMode.OpenOrCreate))
+            {
+                list = await JsonSerializer.DeserializeAsync<List<Employee>>(fs);
+            }
+            using (IsrpoLr2Entities usersEntities = new IsrpoLr2Entities())
+            {
+                foreach (Employee employee in list)
+                {
+                    usersEntities.table1.Add(new table1()
+                    {
+                        idEmployee = employee.CodeStaff,
+                        Post = employee.Position,
+                        FIO = employee.FullName,
+                        Login = employee.Log,
+                        Password = employee.Password,
+                        LastInput = employee.LastEnter,
+                        TypeInput = employee.TypeEnter
+                    });
+                }
+                usersEntities.SaveChanges();
+            }
+        }
+        private void exportWord_Click(object sender, RoutedEventArgs e)
+        {
+            List<table1> allOrder;
+            using (IsrpoLr2Entities entities = new IsrpoLr2Entities())
+            {
+                allOrder = entities.table1.ToList();
+            }
+            var app = new Word.Application();
+            Word.Document document = app.Documents.Add();
+
+            for (int i = 0; i < _sheetsCount; i++)
+            {
+                Word.Paragraph paragraph = document.Paragraphs.Add();
+                Word.Range range = paragraph.Range;
+                Word.Range range1 = paragraph.Range;
+                List<string[]> PostEmployee = new List<string[]>() { //for sheets name
+                    new string[]{ "Продавец" },
+                    new string[]{ "Администратор" },
+                    new string[]{ "Старший смены" },
+                };
+
+
+
+
+                var data = i == 0 ? allOrder.Where(o => o.Post == "Продавец")
+                        : i == 1 ? allOrder.Where(o => o.Post == "Администратор")
+                        : i == 2 ? allOrder.Where(o => o.Post == "Старший смены")
+                        : allOrder; //sort for task
+                List<table1> currentStreet = data.ToList();
+                int countStreetInCategory = currentStreet.Count();
+                Word.Paragraph tableParagraph = document.Paragraphs.Add();
+                Word.Range tableRange = tableParagraph.Range;
+                Word.Table strettTable = document.Tables.Add(tableRange, countStreetInCategory + 1, 3);
+                strettTable.Borders.InsideLineStyle =
+                strettTable.Borders.OutsideLineStyle =
+                Word.WdLineStyle.wdLineStyleSingle;
+                strettTable.Range.Cells.VerticalAlignment =
+                Word.WdCellVerticalAlignment.wdCellAlignVerticalCenter;
+
+                Word.Range cellRange = strettTable.Cell(1, 1).Range;
+                cellRange.Text = "Код сотрудника";
+
+                cellRange = strettTable.Cell(1, 2).Range;
+                cellRange.Text = "ФИО";
+                cellRange = strettTable.Cell(1, 3).Range;
+                cellRange.Text = "Логин";
+
+                strettTable.Rows[1].Range.Bold = 1;
+                strettTable.Rows[1].Range.ParagraphFormat.Alignment = Word.WdParagraphAlignment.wdAlignParagraphCenter;
+                int j = 1;
+                foreach (var currentStaff in currentStreet.OrderBy(a => a.Post))
+                {
+                    range1.Text = Convert.ToString($"Кол-во сотрудников - {currentStreet.OrderBy(a => a.Post).Count()}");
+                    range1.InsertParagraphAfter();
+                    cellRange = strettTable.Cell(j + 1, 1).Range;
+                    cellRange.Text = $"{currentStaff.idEmployee}";
+                    cellRange.ParagraphFormat.Alignment =
+                    Word.WdParagraphAlignment.wdAlignParagraphCenter;
+
+                    cellRange = strettTable.Cell(j + 1, 2).Range;
+                    cellRange.Text = $"{currentStaff.FIO}";
+                    cellRange.ParagraphFormat.Alignment =
+                    Word.WdParagraphAlignment.wdAlignParagraphCenter;
+                    cellRange = strettTable.Cell(j + 1, 3).Range;
+                    cellRange.Text = currentStaff.Login;
+                    cellRange.ParagraphFormat.Alignment =
+                    Word.WdParagraphAlignment.wdAlignParagraphCenter;
+                    cellRange.ParagraphFormat.Alignment = Word.WdParagraphAlignment.wdAlignParagraphCenter;
+                    j++;
+                }
+
+                for (int t = 0; t < _sheetsCount; t++)
+                {
+                    range.Text = Convert.ToString($"Должность - {PostEmployee[i][0]}");
+                    range.InsertParagraphAfter();
+                    //range.InsertParagraphBefore();
+                }
+
+                if (i > 0)
+                {
+                    range.InsertBreak(Word.WdBreakType.wdPageBreak);
+                }
+            }
+            app.Visible = true;
         }
     }
 }
